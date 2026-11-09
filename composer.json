@@ -1,0 +1,40 @@
+{
+    "name": "cycleia/usage-log",
+    "description": "Framework-neutral usage event logging for PHP apps: one row per request or browser event, with the safety rules built in.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["usage", "analytics", "logging", "psr-15", "cakephp", "laravel", "lumen"],
+    "require": {
+        "php": ">=8.2",
+        "ext-json": "*",
+        "ext-pdo": "*"
+    },
+    "require-dev": {
+        "illuminate/http": "^11.0",
+        "nyholm/psr7": "^1.8",
+        "phpunit/phpunit": "^11.0",
+        "psr/http-message": "^1.1 || ^2.0",
+        "psr/http-server-handler": "^1.0",
+        "psr/http-server-middleware": "^1.0"
+    },
+    "suggest": {
+        "psr/http-server-middleware": "For Cycleia\\UsageLog\\Http\\Psr15Middleware (CakePHP 5, Slim, Mezzio)",
+        "illuminate/http": "For Cycleia\\UsageLog\\Http\\LaravelMiddleware (Laravel, Lumen)"
+    },
+    "autoload": {
+        "psr-4": {
+            "Cycleia\\UsageLog\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Cycleia\\UsageLog\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "platform": {
+            "php": "8.2.0"
+        },
+        "sort-packages": true
+    }
+}
