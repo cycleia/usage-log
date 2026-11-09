@@ -21,8 +21,9 @@ use Throwable;
  * (user, role, org, route name, surface, record viewed) or returns null to skip
  * the request. The request body is never read.
  *
- * A request that throws is recorded with status 500 and the exception is
- * rethrown. Nothing the logging does can change the response.
+ * A request that throws is recorded with the HTTP status the exception
+ * stands for (500 if none) and the exception is rethrown. Nothing the logging
+ * does can change the response.
  */
 final class Psr15Middleware implements MiddlewareInterface
 {
@@ -42,12 +43,26 @@ final class Psr15Middleware implements MiddlewareInterface
         try {
             $response = $handler->handle($request);
         } catch (Throwable $e) {
-            $this->log($request, null, 500, $start);
+            $this->log($request, null, self::statusOf($e), $start);
             throw $e;
         }
         $this->log($request, $response, $response->getStatusCode(), $start);
 
         return $response;
+    }
+
+    /**
+     * The HTTP status a thrown error stands for: its code when that is an
+     * HTTP error status (framework HTTP exceptions use it that way), else 500.
+     */
+    private static function statusOf(Throwable $e): int
+    {
+        $code = $e->getCode();
+        if (method_exists($e, 'getStatusCode')) {
+            $code = $e->getStatusCode();
+        }
+
+        return is_int($code) && $code >= 400 && $code <= 599 ? $code : 500;
     }
 
     private function log(ServerRequestInterface $request, ?ResponseInterface $response, int $status, int|float $start): void

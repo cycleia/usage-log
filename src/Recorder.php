@@ -22,18 +22,18 @@ final class Recorder
     ];
 
     private readonly Sanitizer $sanitizer;
-    private ?PDO $pdo = null;
+    private ?Writer $writer = null;
     private int $failures = 0;
 
     /**
-     * @param PDO|Closure(): PDO $connection A PDO, or a closure returning one
-     *        (resolved on the first write, so no connection is opened for
-     *        requests that are not logged).
+     * @param PDO|Writer|Closure(): (PDO|Writer) $connection A PDO, a Writer,
+     *        or a closure returning either (resolved on the first write, so no
+     *        connection is opened for requests that are not logged).
      * @param (Closure(Throwable, ?Event): void)|null $onFailure
      * @param (Closure(): DateTimeImmutable)|null $clock For tests.
      */
     public function __construct(
-        private readonly PDO|Closure $connection,
+        private readonly PDO|Writer|Closure $connection,
         private readonly Config $config = new Config(),
         private readonly ?Closure $onFailure = null,
         private readonly ?Closure $clock = null,
@@ -130,36 +130,21 @@ final class Recorder
      */
     private function insert(array $row): void
     {
-        $columns = '`' . implode('`, `', self::COLUMNS) . '`';
-        $placeholders = ':' . implode(', :', self::COLUMNS);
-        $statement = $this->pdo()->prepare(
-            "INSERT INTO `{$this->config->table}` ({$columns}) VALUES ({$placeholders})"
-        );
-        foreach (self::COLUMNS as $column) {
-            $value = $row[$column];
-            $type = match (true) {
-                $value === null => PDO::PARAM_NULL,
-                is_int($value) => PDO::PARAM_INT,
-                default => PDO::PARAM_STR,
-            };
-            $statement->bindValue(':' . $column, $value, $type);
-        }
-        if ($statement->execute() === false) {
-            throw new \RuntimeException('Usage event insert failed');
-        }
+        $this->writer()->insert($this->config->table, $row);
     }
 
-    private function pdo(): PDO
+    private function writer(): Writer
     {
-        if ($this->pdo === null) {
-            $pdo = $this->connection instanceof Closure ? ($this->connection)() : $this->connection;
-            if (!$pdo instanceof PDO) {
-                throw new \RuntimeException('The connection closure did not return a PDO');
-            }
-            $this->pdo = $pdo;
+        if ($this->writer === null) {
+            $resolved = $this->connection instanceof Closure ? ($this->connection)() : $this->connection;
+            $this->writer = match (true) {
+                $resolved instanceof Writer => $resolved,
+                $resolved instanceof PDO => new PdoWriter($resolved),
+                default => throw new \RuntimeException('The connection must be a PDO or a Writer'),
+            };
         }
 
-        return $this->pdo;
+        return $this->writer;
     }
 
     private function now(): DateTimeImmutable

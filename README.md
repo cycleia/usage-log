@@ -38,8 +38,8 @@ These are enforced by the package, so an application cannot get them wrong:
   SHA-256 prefix is stored.
 - **Lengths are capped** on every text column.
 - **Logging never breaks a request.** A failed write is counted and passed to your `onFailure`
-  callback; the response is unchanged. A request that throws is recorded with status 500 and
-  the exception is rethrown.
+  callback; the response is unchanged. A request that throws is recorded with the HTTP status
+  the exception stands for (its code if 400-599, else 500) and the exception is rethrown.
 - **Browser events are not trusted.** The user, organisation and session come from the server,
   never from the payload; unknown event types and surfaces are rejected, as are timestamps older
   than 7 days or more than 5 minutes ahead.
@@ -66,6 +66,23 @@ $recorder = new Recorder(
     $config,
     fn (Throwable $e) => error_log('usage-log: ' . $e->getMessage()),
 );
+```
+
+### Writing through your framework's connection
+
+Instead of a PDO, pass a `Cycleia\UsageLog\Writer`, for example to reuse CakePHP's connection
+(whose PDO is not public):
+
+```php
+final class CakeWriter implements \Cycleia\UsageLog\Writer
+{
+    public function insert(string $table, array $row): void
+    {
+        \Cake\Datasource\ConnectionManager::get('default')->insert($table, $row);
+    }
+}
+
+$recorder = new Recorder(fn () => new CakeWriter(), $config);
 ```
 
 ## CakePHP 5 (PSR-15)

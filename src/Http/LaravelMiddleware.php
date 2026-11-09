@@ -12,7 +12,8 @@ use Throwable;
 /**
  * Laravel / Lumen middleware. Same behaviour as Psr15Middleware: a base Event
  * from the request facts, completed or skipped by the application's resolver,
- * the body never read, a thrown request recorded as 500 and rethrown.
+ * the body never read, a thrown request recorded with its HTTP status (500 if
+ * none) and rethrown.
  *
  * Register it in the container with its dependencies, e.g. in Lumen:
  *
@@ -38,13 +39,27 @@ final class LaravelMiddleware
         try {
             $response = $next($request);
         } catch (Throwable $e) {
-            $this->log($request, null, 500, $start);
+            $this->log($request, null, self::statusOf($e), $start);
             throw $e;
         }
         $status = is_object($response) && method_exists($response, 'getStatusCode') ? (int)$response->getStatusCode() : 200;
         $this->log($request, $response, $status, $start);
 
         return $response;
+    }
+
+    /**
+     * The HTTP status a thrown error stands for: its code when that is an
+     * HTTP error status (framework HTTP exceptions use it that way), else 500.
+     */
+    private static function statusOf(Throwable $e): int
+    {
+        $code = $e->getCode();
+        if (method_exists($e, 'getStatusCode')) {
+            $code = $e->getStatusCode();
+        }
+
+        return is_int($code) && $code >= 400 && $code <= 599 ? $code : 500;
     }
 
     private function log(Request $request, mixed $response, int $status, int|float $start): void

@@ -79,6 +79,22 @@ final class Psr15MiddlewareTest extends DatabaseTestCase
         $this->assertSame(500, (int)$this->rows()[0]['status']);
     }
 
+    public function testAThrownHttpErrorKeepsItsStatus(): void
+    {
+        $middleware = new Psr15Middleware($this->recorder(), 'crm', $this->resolver());
+
+        try {
+            $middleware->process($this->request(), $this->handler(fn () => throw new RuntimeException('Not found', 404)));
+        } catch (RuntimeException) {
+        }
+        try {
+            $middleware->process($this->request(), $this->handler(fn () => throw new RuntimeException('odd', 42)));
+        } catch (RuntimeException) {
+        }
+
+        $this->assertSame([404, 500], array_map(fn ($r) => (int)$r['status'], $this->rows()));
+    }
+
     public function testResolverReturningNullSkipsTheRequest(): void
     {
         $middleware = new Psr15Middleware($this->recorder(), 'crm', fn () => null);

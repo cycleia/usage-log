@@ -128,6 +128,33 @@ final class RecorderTest extends DatabaseTestCase
         $this->assertCount(2, $this->rows());
     }
 
+    public function testWritesThroughACustomWriter(): void
+    {
+        $writer = new class implements \Cycleia\UsageLog\Writer {
+            public array $calls = [];
+
+            public function insert(string $table, array $row): void
+            {
+                $this->calls[] = [$table, $row];
+            }
+        };
+        $recorder = new Recorder(fn () => $writer, $this->config(['table' => 'usage_log']));
+
+        $this->assertTrue($recorder->record(new Event(app: 'crm', userId: 3)));
+        $this->assertCount(1, $writer->calls);
+        $this->assertSame('usage_log', $writer->calls[0][0]);
+        $this->assertSame(Recorder::COLUMNS, array_keys($writer->calls[0][1]));
+        $this->assertSame(3, $writer->calls[0][1]['user_id']);
+    }
+
+    public function testAConnectionThatIsNeitherPdoNorWriterIsAFailureNotACrash(): void
+    {
+        $recorder = new Recorder(fn () => new \stdClass(), $this->config());
+
+        $this->assertFalse($recorder->record(new Event(app: 'crm')));
+        $this->assertSame(1, $recorder->failures());
+    }
+
     public function testEventWithRejectsUnknownFields(): void
     {
         $this->expectException(\InvalidArgumentException::class);
